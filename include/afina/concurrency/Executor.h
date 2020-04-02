@@ -15,7 +15,11 @@ namespace Concurrency {
 /**
  * # Thread pool
  */
+class Executor;
+void perform(Executor* executer);
+
 class Executor {
+
     enum class State {
         // Threadpool is fully operational, tasks could be added and get executed
         kRun,
@@ -28,8 +32,14 @@ class Executor {
         kStopped
     };
 
-    Executor(std::string name, int size);
+public:
+    Executor(std::string name, size_t low_wm, size_t high_wm, size_t max_queue, size_t idle);
     ~Executor();
+
+    /**
+      * Threadpool on start
+      */
+    void Start();
 
     /**
      * Signal thread pool to stop, it will stop accepting new jobs and close threads just after each become
@@ -48,18 +58,34 @@ class Executor {
      */
     template <typename F, typename... Types> bool Execute(F &&func, Types... args) {
         // Prepare "task"
-        auto exec = std::bind(std::forward<F>(func), std::forward<Types>(args)...);
+        auto task = std::bind(std::forward<F>(func), std::forward<Types>(args)...);
+        {
+            std::unique_lock<std::mutex> lock(this->mutex);
+            if (tasks.size() >= max_queue_size || state != State::kRun)
+            {
+                return false;
+            }
 
-        std::unique_lock<std::mutex> lock(this->mutex);
-        if (state != State::kRun) {
-            return false;
+            // Enqueue new task
+            tasks.push_back(task);
+
+            //No idle threads from pool
+            if (idle == 0  && threads < hight_watermark)
+            {
+                std::thread pool_thread(&perform, this);
+                pool_thread.detach();//detaching thread here - tasks are void
+                idle++;
+            }
         }
 
-        // Enqueue new task
-        tasks.push_back(exec);
+        //New task in queue
         empty_condition.notify_one();
         return true;
     }
+
+    void setName(std::string name);
+
+    std::string getName();
 
 private:
     // No copy/move/assign allowed
@@ -84,9 +110,21 @@ private:
     std::condition_variable empty_condition;
 
     /**
-     * Vector of actual threads that perorm execution
+     * Vector of actual threads that perform execution
      */
-    std::vector<std::thread> threads;
+//    std::vector<std::thread> threads;
+
+    //Using counter instead of thread vector - our tasks are "void", so don't have to store them - can just detach at once
+
+    /**
+     * Threads
+     */
+    size_t threads;
+
+    /**
+     * Currently idle threads
+     */
+    size_t idle;
 
     /**
      * Task queue
@@ -97,8 +135,22 @@ private:
      * Flag to stop bg threads
      */
     State state;
-};
 
+    //Params
+
+    std::string name;
+
+    size_t low_watermark;
+
+    size_t hight_watermark;
+
+    size_t max_queue_size;
+
+    size_t idle_time;
+
+    //Stop cv(synthronizing server and client threads stopping)
+    std::condition_variable cv_stop;
+};
 } // namespace Concurrency
 } // namespace Afina
 

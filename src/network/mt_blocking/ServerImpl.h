@@ -8,6 +8,7 @@
 #include <condition_variable>
 
 #include <afina/network/Server.h>
+#include <afina/concurrency/Executor.h>
 
 namespace spdlog {
 class logger;
@@ -35,6 +36,7 @@ public:
     // See Server.h
     void Join() override;
 
+    // Main client function
     void ClientHandler(int client_socket);
 
 protected:
@@ -58,17 +60,9 @@ private:
     // Thread to run network on
     std::thread _thread;
 
-    //Max number of workers
-    size_t max_workers;
+    //Threadpool
+    Afina::Concurrency::Executor executor;
 
-    //Strong sock_id->thread
-    std::map<int,std::thread> workers;
-
-    //Locking to wait for client workers
-    std::mutex mutex;
-
-    //Wait for client workers
-    std::condition_variable workers_cv;
 
 };
 
