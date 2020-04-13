@@ -91,6 +91,15 @@ void ServerImpl::Stop() {
     if (eventfd_write(_event_fd, 1)) {
         throw std::runtime_error("Failed to wakeup workers");
     }
+
+    for(auto con_iter = connections.begin(); con_iter != connections.end(); ++con_iter)
+    {
+        (*con_iter)->OnClose();
+        delete (*con_iter);
+    }
+
+    connections.clear();
+    close(_server_socket);
 }
 
 // See Server.h
@@ -107,6 +116,7 @@ void ServerImpl::OnRun() {
         throw std::runtime_error("Failed to create epoll file descriptor: " + std::string(strerror(errno)));
     }
 
+    //accepting connections on
     struct epoll_event event;
     event.events = EPOLLIN;
     event.data.fd = _server_socket;
@@ -114,6 +124,7 @@ void ServerImpl::OnRun() {
         throw std::runtime_error("Failed to add file descriptor to epoll");
     }
 
+    //eventfd object
     struct epoll_event event2;
     event2.events = EPOLLIN;
     event2.data.fd = _event_fd;
@@ -122,6 +133,7 @@ void ServerImpl::OnRun() {
     }
 
     bool run = true;
+
     std::array<struct epoll_event, 64> mod_list;
     while (run) {
         int nmod = epoll_wait(epoll_descr, &mod_list[0], mod_list.size(), -1);
@@ -138,7 +150,7 @@ void ServerImpl::OnRun() {
                 continue;
             }
 
-            // That is some connection!
+            // That is some connection! We already have pointer on it in our set
             Connection *pc = static_cast<Connection *>(current_event.data.ptr);
 
             auto old_mask = pc->_event.events;
@@ -162,17 +174,16 @@ void ServerImpl::OnRun() {
                     _logger->error("Failed to delete connection from epoll");
                 }
 
-                close(pc->_socket);
                 pc->OnClose();
-
+                connections.erase(pc);
                 delete pc;
+
             } else if (pc->_event.events != old_mask) {
                 if (epoll_ctl(epoll_descr, EPOLL_CTL_MOD, pc->_socket, &pc->_event)) {
                     _logger->error("Failed to change connection event mask");
 
-                    close(pc->_socket);
                     pc->OnClose();
-
+                    connections.erase(pc);
                     delete pc;
                 }
             }
@@ -185,7 +196,6 @@ void ServerImpl::OnNewConnection(int epoll_descr) {
     for (;;) {
         struct sockaddr in_addr;
         socklen_t in_len;
-
         // No need to make these sockets non blocking since accept4() takes care of it.
         in_len = sizeof in_addr;
         int infd = accept4(_server_socket, &in_addr, &in_len, SOCK_NONBLOCK | SOCK_CLOEXEC);
@@ -207,18 +217,21 @@ void ServerImpl::OnNewConnection(int epoll_descr) {
         }
 
         // Register the new FD to be monitored by epoll.
-        Connection *pc = new(std::nothrow) Connection(infd);
+        Connection *pc = new(std::nothrow) Connection(infd, pStorage, _logger);
+//        pc->setStorage(pStorage);
         if (pc == nullptr) {
             throw std::runtime_error("Failed to allocate connection");
         }
 
-        // Register connection in worker's epoll
         pc->Start();
         if (pc->isAlive()) {
             if (epoll_ctl(epoll_descr, EPOLL_CTL_ADD, pc->_socket, &pc->_event)) {
                 pc->OnError();
+                connections.erase(pc);
                 delete pc;
             }
+            // Register connection in worker's epoll
+            connections.insert(pc);
         }
     }
 }
