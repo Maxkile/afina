@@ -158,7 +158,7 @@ void Connection::DoWrite()
         for(size_t i = 0; i < answer_size;++i)
         {
             out[i].iov_len = answer[i].size();
-            out[i].iov_base = &answer[i];
+            out[i].iov_base = &answer[i][0];
         }
 
         out[0].iov_base = static_cast<char*>(out[0].iov_base) +  written_bytes;//offset of answer[j]
@@ -169,13 +169,13 @@ void Connection::DoWrite()
 
             //have to subtract sizes of fully written answer[j] and delete them from 'answer'
             answers_fully_written = 0;
-            while((written_bytes - answer[answers_fully_written].size() >= 0) && (answers_fully_written < answer_size))
+            while((answers_fully_written < answer_size) && (written_bytes - answer[answers_fully_written].size() >= 0))
             {
                 written_bytes -= answer[answers_fully_written].size();
                 ++answers_fully_written;
             }
 
-            if (answer.begin() + answers_fully_written >= answer.end())
+            if (answer.begin() + answers_fully_written > answer.end())
             {
                 alive = false;
                 throw std::runtime_error(std::string(strerror(errno)));

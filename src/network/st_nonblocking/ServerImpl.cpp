@@ -121,7 +121,7 @@ void ServerImpl::OnRun() {
     event.events = EPOLLIN;
     event.data.fd = _server_socket;
     if (epoll_ctl(epoll_descr, EPOLL_CTL_ADD, _server_socket, &event)) {
-        throw std::runtime_error("Failed to add file descriptor to epoll");
+        throw std::runtime_error("Failed to add file descriptor to epoll: " + std::string(strerror(errno)));
     }
 
     //eventfd object
@@ -129,7 +129,7 @@ void ServerImpl::OnRun() {
     event2.events = EPOLLIN;
     event2.data.fd = _event_fd;
     if (epoll_ctl(epoll_descr, EPOLL_CTL_ADD, _event_fd, &event2)) {
-        throw std::runtime_error("Failed to add file descriptor to epoll");
+        throw std::runtime_error("Failed to add file descriptor to epoll: " + std::string(strerror(errno)));
     }
 
     bool run = true;
@@ -171,7 +171,7 @@ void ServerImpl::OnRun() {
             // Does it alive?
             if (!pc->isAlive()) {
                 if (epoll_ctl(epoll_descr, EPOLL_CTL_DEL, pc->_socket, &pc->_event)) {
-                    _logger->error("Failed to delete connection from epoll");
+                    _logger->error("Failed to delete connection from epoll: " + std::string(strerror(errno)));
                 }
 
                 pc->OnClose();
@@ -180,7 +180,7 @@ void ServerImpl::OnRun() {
 
             } else if (pc->_event.events != old_mask) {
                 if (epoll_ctl(epoll_descr, EPOLL_CTL_MOD, pc->_socket, &pc->_event)) {
-                    _logger->error("Failed to change connection event mask");
+                    _logger->error("Failed to change connection event mask: " + std::string(strerror(errno)));
 
                     pc->OnClose();
                     connections.erase(pc);
@@ -226,6 +226,7 @@ void ServerImpl::OnNewConnection(int epoll_descr) {
         pc->Start();
         if (pc->isAlive()) {
             if (epoll_ctl(epoll_descr, EPOLL_CTL_ADD, pc->_socket, &pc->_event)) {
+                _logger->error("Failed to add connection to epoll. " + std::string(strerror(errno)));
                 pc->OnError();
                 connections.erase(pc);
                 delete pc;
