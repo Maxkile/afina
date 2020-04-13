@@ -100,7 +100,7 @@ void ServerImpl::Start(uint16_t port, uint32_t n_acceptors, uint32_t n_workers) 
         _workers.back().Start(_data_epoll_fd);
     }
 
-    // Start acceptors
+    // Start (acceptors
     _acceptors.reserve(n_acceptors);
     for (int i = 0; i < n_acceptors; i++) {
         _acceptors.emplace_back(&ServerImpl::OnRun, this);
