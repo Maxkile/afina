@@ -33,7 +33,7 @@ class Executor {
     };
 
 public:
-    Executor(std::string name, size_t low_wm, size_t high_wm, size_t max_queue, size_t idle);
+    Executor(size_t low_wm, size_t high_wm, size_t max_queue, size_t idle);
     ~Executor();
 
     /**
@@ -83,10 +83,6 @@ public:
         return true;
     }
 
-    void setName(std::string name);
-
-    std::string getName();
-
 private:
     // No copy/move/assign allowed
     Executor(const Executor &);            // = delete;
@@ -98,6 +94,8 @@ private:
      * Main function that all pool threads are running. It polls internal task queue and execute tasks
      */
     friend void perform(Executor *executor);
+
+    static void empty_task(){}
 
     /**
      * Mutex to protect state below from concurrent modification
@@ -137,8 +135,6 @@ private:
     State state;
 
     //Params
-
-    std::string name;
 
     size_t low_watermark;
 

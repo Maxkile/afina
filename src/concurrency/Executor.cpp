@@ -9,7 +9,7 @@ namespace Concurrency {
 
 
 
-Executor::Executor(std::string name, size_t low_wm, size_t hight_wm, size_t max_queue, size_t idle): threads(0), idle(0), name(name), low_watermark(low_wm),
+Executor::Executor(size_t low_wm, size_t hight_wm, size_t max_queue, size_t idle): threads(0), idle(0), low_watermark(low_wm),
                     hight_watermark(hight_wm), max_queue_size(max_queue), idle_time(idle){};
 
 //All done in Stop()
@@ -41,12 +41,9 @@ void Executor::Stop(bool await)
             {
                 cv_stop.wait(lock);
             }
-            state = State::kStopped;
         }
-        else if (threads == 0)
-        {
-            state = State::kStopped;
-        }
+
+        state = State::kStopped;
     }
 
 }
@@ -56,7 +53,7 @@ void perform(Executor *executor)
     bool expired = false;
         while (!expired)//thread life cycle
         {
-            std::function<void()> task;
+            std::function<void()> task = executor->empty_task;
             {
                 std::unique_lock<std::mutex> lock(executor->mutex);//to get task
 
@@ -65,11 +62,12 @@ void perform(Executor *executor)
                     break;
                 }
 
+                auto timeout = std::chrono::system_clock::now() + std::chrono::milliseconds(executor->idle_time);
 
                 while ((executor->tasks.empty()) && (executor->state == Executor::State::kRun))//state: empty task queue - waiting...
                 {
-                    if (executor->empty_condition.wait_until(lock, std::chrono::system_clock::now() + std::chrono::milliseconds(executor->idle_time)) == std::cv_status::timeout &&
-                        (executor->threads + executor->idle) >= executor->low_watermark)
+                    if (executor->empty_condition.wait_until(lock, timeout) == std::cv_status::timeout &&
+                        (executor->threads + executor->idle) > executor->low_watermark)
                     {
                             //"killing" thread
                             expired = true;
@@ -91,10 +89,14 @@ void perform(Executor *executor)
                 }
             }
 
-            if (!expired)
+            try
             {
-                task();//executing task
+                if (!expired)
+                {
+                    task();//executing task
+                }
             }
+            catch(std::exception& exc){}
 
             {
                 std::unique_lock<std::mutex> lock(executor->mutex);
@@ -111,16 +113,6 @@ void perform(Executor *executor)
                 }
             }
         }
-}
-
-std::string Executor::getName()
-{
-    return name;
-}
-
-void Executor::setName(std::string name)
-{
-    this->name = name;
 }
 
 }

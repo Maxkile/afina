@@ -28,7 +28,7 @@ namespace Network {
 namespace MTblocking {
 
 // See Server.h
-ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl): Server(ps, pl), executor("threadpool",4,10,20,200) {}
+ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl): Server(ps, pl), executor(4,10,20,200) {}
 
 // See Server.h
 ServerImpl::~ServerImpl() {}
@@ -136,7 +136,6 @@ void ServerImpl::OnRun() {
             setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
         }
         if (!executor.Execute(&ServerImpl::ClientHandler,this,client_socket)){
-//            close(client_socket);
             throw std::runtime_error("Failed to send response");
         }
     }

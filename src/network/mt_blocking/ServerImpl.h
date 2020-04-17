@@ -3,7 +3,6 @@
 
 #include <atomic>
 #include <thread>
-#include <map>
 #include <mutex>
 #include <condition_variable>
 
@@ -36,9 +35,6 @@ public:
     // See Server.h
     void Join() override;
 
-    // Main client function
-    void ClientHandler(int client_socket);
-
 protected:
     /**
      * Method is running in the connection acceptor thread
@@ -63,6 +59,8 @@ private:
     //Threadpool
     Afina::Concurrency::Executor executor;
 
+    // Main client function
+    void ClientHandler(int client_socket);
 
 };
 
