@@ -2,7 +2,7 @@
 #define AFINA_NETWORK_ST_NONBLOCKING_SERVER_H
 
 #include <thread>
-#include <set>
+#include <unordered_set>
 #include <vector>
 
 #include <afina/network/Server.h>
@@ -60,7 +60,7 @@ private:
     // IO thread
     std::thread _work_thread;
 
-    std::set<Connection*> connections;
+    std::unordered_set<Connection*> connections;
     };
 
 } // namespace STnonblock
