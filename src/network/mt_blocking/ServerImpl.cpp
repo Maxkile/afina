@@ -84,7 +84,7 @@ void ServerImpl::Stop() {
         std::unique_lock<std::mutex> lock(mutex);
         for(auto workers_iter = workers.begin(); workers_iter != workers.end(); ++workers_iter)
         {
-            shutdown(workers_iter->first, SHUT_RDWR);
+            shutdown(*workers_iter, SHUT_RD);
         }
     }
 }
@@ -151,15 +151,16 @@ void ServerImpl::OnRun() {
             std::unique_lock<std::mutex> lock(mutex);
             if (workers.size() < max_workers)
             {
-                workers.emplace(client_socket,std::thread(&ServerImpl::ClientHandler,this,client_socket));
+                std::thread worker(&ServerImpl::ClientHandler,this,client_socket);
+                worker.detach();
             }
             else
             {
                 static const std::string msg = "Client connections maximum reached. Closing...";
-                if (send(client_socket, msg.data(), msg.size(), 0) == -1)
-                {
-                    throw std::runtime_error("Failed to send response");
-                }
+//                if (send(client_socket, msg.data(), msg.size(), 0) == -1)
+//                {
+//                    throw std::runtime_error("Failed to send response");
+//                }
                 close(client_socket);
             }
         }
@@ -281,11 +282,9 @@ void ServerImpl::ClientHandler(int client_socket){
     // We are done with this connection
     close(client_socket);
 
-    //Deleting from workers map
+    //Deleting socket from set
     {
         std::unique_lock<std::mutex> lock(mutex);//to work with map
-        auto worker_iter = workers.find(client_socket);
-        worker_iter->second.detach();
         workers.erase(client_socket);
     }
 
