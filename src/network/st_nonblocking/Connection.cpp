@@ -41,7 +41,6 @@ void Connection::OnError()
 void Connection::OnClose()
 {
     alive = false;
-    close(_socket);
     _logger->info("Closing connection {}",_event.data.fd);
 }
 

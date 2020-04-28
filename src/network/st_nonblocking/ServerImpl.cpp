@@ -158,6 +158,7 @@ void ServerImpl::OnRun() {
                 pc->OnError();
             } else if (current_event.events & EPOLLRDHUP) {
                 pc->OnClose();
+                close(pc->_socket);
             } else {
                 // Depends on what connection wants...
                 if (current_event.events & EPOLLIN) {
@@ -175,6 +176,7 @@ void ServerImpl::OnRun() {
                 }
 
                 pc->OnClose();
+                close(pc->_socket);
                 connections.erase(pc);
                 delete pc;
 
@@ -183,6 +185,7 @@ void ServerImpl::OnRun() {
                     _logger->error("Failed to change connection event mask: " + std::string(strerror(errno)));
 
                     pc->OnClose();
+                    close(pc->_socket);
                     connections.erase(pc);
                     delete pc;
                 }
