@@ -58,7 +58,7 @@ private:
     // EPOLL instance shared between workers
     int _data_epoll_fd;
 
-    // Curstom event "device" used to wakeup workers
+    // Custom event "device" used to wakeup workers
     int _event_fd;
 
     // threads serving read/write requests
