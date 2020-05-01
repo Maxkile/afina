@@ -100,7 +100,7 @@ void ServerImpl::Start(uint16_t port, uint32_t n_acceptors, uint32_t n_workers) 
         _workers.back().Start(_data_epoll_fd);
     }
 
-    // Start acceptors
+    // Start (acceptors
     _acceptors.reserve(n_acceptors);
     for (int i = 0; i < n_acceptors; i++) {
         _acceptors.emplace_back(&ServerImpl::OnRun, this);
@@ -119,6 +119,8 @@ void ServerImpl::Stop() {
     if (eventfd_write(_event_fd, 1)) {
         throw std::runtime_error("Failed to wakeup workers");
     }
+
+    close(_server_socket);
 }
 
 // See Server.h
@@ -134,14 +136,15 @@ void ServerImpl::Join() {
 
 // See ServerImpl.h
 void ServerImpl::OnRun() {
-    _logger->info("Start acceptor");
+//    _logger->info("Start acceptor");
+    _logger->warn("Starting acceptor...");
     int acceptor_epoll = epoll_create1(0);
     if (acceptor_epoll == -1) {
         throw std::runtime_error("Failed to create epoll file descriptor: " + std::string(strerror(errno)));
     }
 
     struct epoll_event event;
-    event.events = EPOLLIN | EPOLLEXCLUSIVE;
+    event.events = EPOLLIN | EPOLLEXCLUSIVE;//no thundering herd
     event.data.fd = _server_socket;
     if (epoll_ctl(acceptor_epoll, EPOLL_CTL_ADD, _server_socket, &event)) {
         throw std::runtime_error("Failed to add file descriptor to epoll");
@@ -193,7 +196,7 @@ void ServerImpl::OnRun() {
                 }
 
                 // Register the new FD to be monitored by epoll.
-                Connection *pc = new Connection(infd);
+                Connection *pc = new Connection(infd, pStorage, _logger);
                 if (pc == nullptr) {
                     throw std::runtime_error("Failed to allocate connection");
                 }
@@ -201,7 +204,7 @@ void ServerImpl::OnRun() {
                 // Register connection in worker's epoll
                 pc->Start();
                 if (pc->isAlive()) {
-                    pc->_event.events |= EPOLLONESHOT;
+                    pc->_event.events |= EPOLLONESHOT;//charging fd
                     int epoll_ctl_retval;
                     if ((epoll_ctl_retval = epoll_ctl(_data_epoll_fd, EPOLL_CTL_ADD, pc->_socket, &pc->_event))) {
                         _logger->debug("epoll_ctl failed during connection register in workers'epoll: error {}", epoll_ctl_retval);

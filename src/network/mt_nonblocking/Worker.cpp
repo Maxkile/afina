@@ -22,14 +22,10 @@ namespace MTnonblock {
 
 // See Worker.h
 Worker::Worker(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Afina::Logging::Service> pl)
-    : _pStorage(ps), _pLogging(pl), isRunning(false), _epoll_fd(-1) {
-    // TODO: implementation here
-}
+    : _pStorage(ps), _pLogging(pl), isRunning(false), _epoll_fd(-1) {}
 
 // See Worker.h
-Worker::~Worker() {
-    // TODO: implementation here
-}
+Worker::~Worker() {}
 
 // See Worker.h
 Worker::Worker(Worker &&other) { *this = std::move(other); }
@@ -69,7 +65,7 @@ void Worker::Join() {
 void Worker::OnRun() {
     assert(_epoll_fd >= 0);
     _logger->trace("OnRun");
-
+    _logger->warn("Starting worker...");
     // Process connection events
     //
     // Do not forget to use EPOLLEXCLUSIVE flag when register socket
@@ -112,23 +108,25 @@ void Worker::OnRun() {
 
             // Rearm connection
             if (pconn->isAlive()) {
-                pconn->_event.events |= EPOLLONESHOT;
+                pconn->_event.events |= EPOLLET | EPOLLONESHOT;
                 int epoll_ctl_retval;
                 if ((epoll_ctl_retval = epoll_ctl(_epoll_fd, EPOLL_CTL_MOD, pconn->_socket, &pconn->_event))) {
                     _logger->debug("epoll_ctl failed during connection rearm: error {}", epoll_ctl_retval);
                     pconn->OnError();
+                    close(pconn->_socket);
                     delete pconn;
                 }
             }
             // Or delete closed one
             else {
                 if (epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, pconn->_socket, &pconn->_event)) {
-                    std::cerr << "Failed to delete connection!" << std::endl;
+//                    std::cerr << "Failed to delete connection!" << std::endl;
+                    _logger->error("Failed to delete conection on: {}.{}",pconn->_socket,std::string(strerror(errno)));
                 }
+                close(pconn->_socket);
                 delete pconn;
             }
         }
-        // TODO: Select timeout...
     }
     _logger->warn("Worker stopped");
 }
