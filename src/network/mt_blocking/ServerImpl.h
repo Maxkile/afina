@@ -3,7 +3,7 @@
 
 #include <atomic>
 #include <thread>
-#include <unordered_set>
+#include <map>
 #include <mutex>
 #include <condition_variable>
 
@@ -35,6 +35,8 @@ public:
     // See Server.h
     void Join() override;
 
+    void ClientHandler(int client_socket);
+
 protected:
     /**
      * Method is running in the connection acceptor thread
@@ -59,16 +61,14 @@ private:
     //Max number of workers
     size_t max_workers;
 
-    //Sock_ids
-    std::unordered_set<int> workers;
+    //Strong sock_id->thread
+    std::map<int,std::thread> workers;
 
     //Locking to wait for client workers
     std::mutex mutex;
 
     //Wait for client workers
     std::condition_variable workers_cv;
-
-    void ClientHandler(int client_socket);
 
 };
 
