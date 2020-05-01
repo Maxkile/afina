@@ -3,9 +3,6 @@
 
 #include <atomic>
 #include <thread>
-#include <map>
-#include <mutex>
-#include <condition_variable>
 
 #include <afina/network/Server.h>
 
@@ -35,8 +32,6 @@ public:
     // See Server.h
     void Join() override;
 
-    void ClientHandler(int client_socket);
-
 protected:
     /**
      * Method is running in the connection acceptor thread
@@ -57,19 +52,6 @@ private:
 
     // Thread to run network on
     std::thread _thread;
-
-    //Max number of workers
-    size_t max_workers;
-
-    //Strong sock_id->thread
-    std::map<int,std::thread> workers;
-
-    //Locking to wait for client workers
-    std::mutex mutex;
-
-    //Wait for client workers
-    std::condition_variable workers_cv;
-
 };
 
 } // namespace MTblocking
