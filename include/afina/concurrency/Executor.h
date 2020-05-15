@@ -16,7 +16,7 @@ namespace Concurrency {
  * # Thread pool
  */
 class Executor;
-void perform(Executor* executer);
+void perform(Executor *executer);
 
 class Executor {
 
@@ -37,8 +37,8 @@ public:
     ~Executor();
 
     /**
-      * Threadpool on start
-      */
+     * Threadpool on start
+     */
     void Start();
 
     /**
@@ -61,24 +61,22 @@ public:
         auto task = std::bind(std::forward<F>(func), std::forward<Types>(args)...);
         {
             std::unique_lock<std::mutex> lock(this->mutex);
-            if (tasks.size() >= max_queue_size || state != State::kRun)
-            {
+            if (tasks.size() >= max_queue_size || state != State::kRun) {
                 return false;
             }
 
             // Enqueue new task
             tasks.push_back(task);
 
-            //No idle threads from pool
-            if (idle == 0  && threads < hight_watermark)
-            {
+            // No idle threads from pool
+            if (idle == 0 && threads < hight_watermark) {
                 std::thread pool_thread(&perform, this);
-                pool_thread.detach();//detaching thread here - tasks are void
+                pool_thread.detach(); // detaching thread here - tasks are void
                 idle++;
             }
         }
 
-        //New task in queue
+        // New task in queue
         empty_condition.notify_one();
         return true;
     }
@@ -95,7 +93,7 @@ private:
      */
     friend void perform(Executor *executor);
 
-    static void empty_task(){}
+    static void empty_task() {}
 
     /**
      * Mutex to protect state below from concurrent modification
@@ -110,9 +108,10 @@ private:
     /**
      * Vector of actual threads that perform execution
      */
-//    std::vector<std::thread> threads;
+    //    std::vector<std::thread> threads;
 
-    //Using counter instead of thread vector - our tasks are "void", so don't have to store them - can just detach at once
+    // Using counter instead of thread vector - our tasks are "void", so don't have to store them - can just detach at
+    // once
 
     /**
      * Threads
@@ -134,7 +133,7 @@ private:
      */
     State state;
 
-    //Params
+    // Params
 
     size_t low_watermark;
 
@@ -144,7 +143,7 @@ private:
 
     size_t idle_time;
 
-    //Stop cv(synthronizing server and client threads stopping)
+    // Stop cv(synthronizing server and client threads stopping)
     std::condition_variable cv_stop;
 };
 } // namespace Concurrency
