@@ -93,8 +93,6 @@ private:
      */
     friend void perform(Executor *executor);
 
-    static void empty_task() {}
-
     /**
      * Mutex to protect state below from concurrent modification
      */

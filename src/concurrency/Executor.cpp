@@ -4,6 +4,8 @@
 #include <iostream>
 #include <utility>
 
+static void empty_task() {}
+
 namespace Afina {
 namespace Concurrency {
 
@@ -16,26 +18,22 @@ Executor::~Executor(){};
 
 void Executor::Start() {
     state = State::kRun;
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        for (size_t i = 0; i < low_watermark; ++i) {
-            std::thread pool_thread(&perform, this);
-            pool_thread.detach(); // no tasks yet
-        }
+    std::unique_lock<std::mutex> lock(mutex);
+    for (size_t i = 0; i < low_watermark; ++i) {
+        std::thread pool_thread(&perform, this);
+        pool_thread.detach(); // no tasks yet
     }
 }
 
 void Executor::Stop(bool await) {
-    {
-        std::unique_lock<std::mutex> lock(mutex);
-        state = State::kStopping;
+    std::unique_lock<std::mutex> lock(mutex);
+    state = State::kStopping;
 
-        if (await && threads > 0) {
-            while (threads > 0) {
-                cv_stop.wait(lock);
-            }
+    if (await) {
+        while (threads > 0) {
+            cv_stop.wait(lock);
         }
-
+    } else if (threads == 0) {
         state = State::kStopped;
     }
 }
@@ -44,11 +42,11 @@ void perform(Executor *executor) {
     bool expired = false;
     while (!expired) // thread life cycle
     {
-        std::function<void()> task = executor->empty_task;
+        std::function<void()> task = empty_task;
         {
             std::unique_lock<std::mutex> lock(executor->mutex); // to get task
 
-            if (executor->state != Executor::State::kRun) // if server changed state but haven't captured mutex yet
+            if (executor->state == Executor::State::kStopped) // if server changed state but haven't captured mutex yet
             {
                 break;
             }
@@ -79,10 +77,9 @@ void perform(Executor *executor) {
         }
 
         try {
-            if (!expired) {
-                task(); // executing task
-            }
+            task(); // executing task
         } catch (std::exception &exc) {
+            std::cerr << exc.what() << std::endl; // change to logger
         }
 
         {
