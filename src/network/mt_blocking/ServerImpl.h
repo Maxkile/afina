@@ -3,8 +3,12 @@
 
 #include <atomic>
 #include <thread>
+#include <map>
+#include <mutex>
+#include <condition_variable>
 
 #include <afina/network/Server.h>
+#include <afina/concurrency/Executor.h>
 
 namespace spdlog {
 class logger;
@@ -32,6 +36,9 @@ public:
     // See Server.h
     void Join() override;
 
+    // Main client function
+    void ClientHandler(int client_socket);
+
 protected:
     /**
      * Method is running in the connection acceptor thread
@@ -52,6 +59,11 @@ private:
 
     // Thread to run network on
     std::thread _thread;
+
+    //Threadpool
+    Afina::Concurrency::Executor executor;
+
+
 };
 
 } // namespace MTblocking
