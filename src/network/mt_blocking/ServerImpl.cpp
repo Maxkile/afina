@@ -93,13 +93,12 @@ void ServerImpl::Stop() {
 void ServerImpl::Join() {
     {
         std::unique_lock<std::mutex> lock(mutex);
-        while (!workers.empty()) {
+        while (!workers.empty() && running.load()) {
             workers_cv.wait(lock);
         }
     }
     assert(_thread.joinable());
     _thread.join();
-    close(_server_socket);
 }
 
 // See Server.h
@@ -139,24 +138,18 @@ void ServerImpl::OnRun() {
         }
 
         // Configure read timeout
-        {
-            struct timeval tv;
-            tv.tv_sec = 5; // TODO: make it configurable
-            tv.tv_usec = 0;
-            setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
-        }
+        struct timeval tv;
+        tv.tv_sec = 5; // TODO: make it configurable
+        tv.tv_usec = 0;
+        setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char *)&tv, sizeof tv);
 
         {
             std::unique_lock<std::mutex> lock(mutex);
             if (workers.size() < max_workers) {
+                workers.insert(client_socket);
                 std::thread worker(&ServerImpl::ClientHandler, this, client_socket);
                 worker.detach();
             } else {
-                static const std::string msg = "Client connections maximum reached. Closing...";
-                //                if (send(client_socket, msg.data(), msg.size(), 0) == -1)
-                //                {
-                //                    throw std::runtime_error("Failed to send response");
-                //                }
                 close(client_socket);
             }
         }
@@ -174,13 +167,13 @@ void ServerImpl::ClientHandler(int client_socket) {
     std::size_t arg_remains;
     size_t buf_size = 4096;
     char command_buf[buf_size];
-    int read_bytes;
+    int read_bytes = -1;
 
     try {
-        while ((read_bytes = read(client_socket, command_buf, sizeof(command_buf))) > 0) {
+        while (running.load() && (read_bytes = read(client_socket, command_buf, sizeof(command_buf))) > 0) {
             _logger->debug("Got {} bytes from socket", read_bytes);
 
-            // Single block of data readed from the socket could trigger inside actions a multiple times,
+            // Single block of data readed from the socket could trigger inside actions a multiple times,a
             // for example:
             // - read#0: [<command1 start>]
             // - read#1: [<command1 end> <argument> <command2> <argument for command 2> <command3> ... ]
@@ -242,7 +235,7 @@ void ServerImpl::ClientHandler(int client_socket) {
             }
         }
 
-        if (read_bytes == 0) {
+        if ((read_bytes == 0) || (!running.load())) {
             _logger->debug("Connection closed");
         } else {
             throw std::runtime_error(std::string(strerror(errno)));
@@ -262,12 +255,10 @@ void ServerImpl::ClientHandler(int client_socket) {
     close(client_socket);
 
     // Deleting socket from set
-    {
-        std::unique_lock<std::mutex> lock(mutex); // to work with map
-        workers.erase(client_socket);
-    }
+    std::unique_lock<std::mutex> lock(mutex); // to work with map
+    workers.erase(client_socket);
 
-    // If server thread is waiting for us to stop and we are last
+    // If server thread is waiting for us to stop
     if (!running.load() && workers.empty()) {
         workers_cv.notify_all();
     }
