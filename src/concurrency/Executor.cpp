@@ -59,6 +59,7 @@ void perform(Executor *executor) {
                 if (executor->empty_condition.wait_until(lock, timeout) == std::cv_status::timeout &&
                     (executor->threads + executor->idle) > executor->low_watermark) {
                     //"killing" thread
+                    executor->idle--;
                     expired = true;
                     break;
                 }
@@ -84,9 +85,7 @@ void perform(Executor *executor) {
 
         {
             std::unique_lock<std::mutex> lock(executor->mutex);
-            if (!expired) {
-                executor->idle++;
-            }
+            executor->idle++;
             executor->threads--;
 
             if (executor->state == Executor::State::kStopping && executor->tasks.empty()) // stopping...
