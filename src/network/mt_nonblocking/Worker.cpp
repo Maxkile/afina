@@ -120,8 +120,9 @@ void Worker::OnRun() {
             // Or delete closed one
             else {
                 if (epoll_ctl(_epoll_fd, EPOLL_CTL_DEL, pconn->_socket, &pconn->_event)) {
-//                    std::cerr << "Failed to delete connection!" << std::endl;
-                    _logger->error("Failed to delete conection on: {}.{}",pconn->_socket,std::string(strerror(errno)));
+                    //                    std::cerr << "Failed to delete connection!" << std::endl;
+                    _logger->error("Failed to delete conection on: {}.{}", pconn->_socket,
+                                   std::string(strerror(errno)));
                 }
                 close(pconn->_socket);
                 delete pconn;
