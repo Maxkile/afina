@@ -66,7 +66,7 @@ void perform(Executor *executor) {
             }
 
             if (!expired) {
-                // state: expired but no tasks
+                // state: no tasks in queue
                 if (executor->tasks.empty()) {
                     continue;
                 }
@@ -87,13 +87,12 @@ void perform(Executor *executor) {
             std::unique_lock<std::mutex> lock(executor->mutex);
             executor->idle++;
             executor->threads--;
-
-            if (executor->state == Executor::State::kStopping && executor->tasks.empty()) // stopping...
-            {
-                executor->cv_stop.notify_all();
-                break;
-            }
         }
+    }
+
+    if (executor->state == Executor::State::kStopping && executor->tasks.empty()) // stopping...
+    {
+        executor->cv_stop.notify_all();
     }
 }
 
